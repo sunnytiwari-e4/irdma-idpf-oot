@@ -52,6 +52,9 @@
 
 set -e
 
+LIBFABRIC_VERSION=v2.4.0
+IEFS_KERNEL_UPDATES_VERSION=ecf39a2
+
 BUILD_LIBFABRIC=true
 for arg in "$@"; do
 	if [[ "$arg" == "--no-libfabric" ]]; then
@@ -75,6 +78,7 @@ sudo dnf install -y kernel-rpm-macros libuuid-devel rpm-build make gcc autoconf 
 echo "Building and installing iefs-kernel-updates..."
 git clone https://github.com/intel/iefs-kernel-updates.git
 pushd iefs-kernel-updates/
+git checkout "${IEFS_KERNEL_UPDATES_VERSION}"
 ./do-update-makerpm.sh -S "${PWD}" -w "${PWD}/tmp"
 rpmbuild --rebuild --define "_topdir $(pwd)" --nodeps tmp/rpmbuild/SRPMS/*.src.rpm
 KVER_MANGLED=$(uname -r | tr '-' '_')
@@ -84,7 +88,7 @@ popd
 
 if ${BUILD_LIBFABRIC}; then
 	echo "Building and installing libfabric..."
-	git clone https://github.com/ofiwg/libfabric.git --depth 1
+	git clone --branch "${LIBFABRIC_VERSION}" --depth 1 https://github.com/ofiwg/libfabric.git
 	pushd libfabric
 	./autogen.sh
 	./configure --prefix=/opt/libfabric \
