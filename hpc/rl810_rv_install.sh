@@ -6,6 +6,8 @@
 ###########################################################
 # Helper script to build and install the PSM3 RV module and a version
 # of libfabric with PSM3 RV support.
+#
+# Pass --no-libfabric to skip building libfabric.
 ###########################################################
 # To use PSM3 RV/mode 1:
 # * Run this script on all VMs.
@@ -50,6 +52,14 @@
 
 set -e
 
+BUILD_LIBFABRIC=true
+for arg in "$@"; do
+	if [[ "$arg" == "--no-libfabric" ]]; then
+		BUILD_LIBFABRIC=false
+		break
+	fi
+done
+
 echo "Installing build dependencies..."
 sudo dnf install -y kernel-rpm-macros libuuid-devel rpm-build make gcc autoconf automake libtool kernel-devel-$(uname -r)
 
@@ -63,23 +73,25 @@ sudo dnf install -y RPMS/x86_64/kmod-iefs-kernel-updates-${KVER_MANGLED}-*.x86_6
 sudo dnf install -y RPMS/x86_64/iefs-kernel-updates-devel-${KVER_MANGLED}-*.x86_64.rpm
 popd
 
-echo "Building and installing libfabric..."
-git clone https://github.com/ofiwg/libfabric.git --depth 1
-pushd libfabric
-./autogen.sh
-./configure --prefix=/opt/libfabric \
-    --enable-rxm=yes \
-    --enable-rxd=yes \
-    --enable-lnx=yes \
-    --enable-shm=yes \
-    --enable-udp=yes \
-    --enable-tcp=yes \
-    --enable-verbs=yes \
-    --enable-psm3=dl \
-    --with-psm3-rv=yes
-make -j"$(nproc)"
-sudo make install
-popd
+if ${BUILD_LIBFABRIC}; then
+	echo "Building and installing libfabric..."
+	git clone https://github.com/ofiwg/libfabric.git --depth 1
+	pushd libfabric
+	./autogen.sh
+	./configure --prefix=/opt/libfabric \
+	    --enable-rxm=yes \
+	    --enable-rxd=yes \
+	    --enable-lnx=yes \
+	    --enable-shm=yes \
+	    --enable-udp=yes \
+	    --enable-tcp=yes \
+	    --enable-verbs=yes \
+	    --enable-psm3=dl \
+	    --with-psm3-rv=yes
+	make -j"$(nproc)"
+	sudo make install
+	popd
+fi
 
 sudo modprobe rv
 
