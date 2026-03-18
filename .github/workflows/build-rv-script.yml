@@ -1,0 +1,44 @@
+name: Build RV Install Script 
+
+on:
+  push:
+    branches: [ "CI" ]
+  pull_request:
+    branches: [ "CI" ]
+
+jobs:
+  build-rocky8:
+    runs-on: ubuntu-latest
+    container:
+      image: rockylinux:8
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup environment and Mock Kernel
+        run: |
+          # Install basic utilities AND the build stack
+          dnf groupinstall -y "Development Tools"
+          dnf install -y sudo wget curl git rpm-build
+          
+          # Find and install the latest kernel-devel
+          ROCKY_KVER=$(dnf repoquery --latest-limit 1 -q kernel-devel | sed 's/kernel-devel-//' | sed 's/^[0-9]\+://')
+          dnf install -y kernel-devel-${ROCKY_KVER}
+          
+          # Create the uname wrapper
+          mv /usr/bin/uname /usr/bin/uname.orig
+          echo -e '#!/bin/bash\nif [[ "$1" == "-r" ]]; then echo "'$ROCKY_KVER'"; else /usr/bin/uname.orig "$@"; fi' > /usr/bin/uname
+          chmod +x /usr/bin/uname
+
+      - name: Run the install script
+        run: |
+          # Create the required base directory for mktemp
+          mkdir -p "/run/user/$(id -u)"
+          
+          # The script attempts to modprobe which won't work in a container without privileged access
+          # We can comment out the modprobe line just for the CI build step
+          sed -i 's/sudo modprobe rv/# sudo modprobe rv/' hpc/rl810_rv_install.sh
+          
+          # Run the script
+          bash hpc/rl810_rv_install.sh
